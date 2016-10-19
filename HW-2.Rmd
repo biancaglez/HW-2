@@ -1,6 +1,6 @@
 ---
 title: "MATH 216 Homework 2"
-author: "WRITE YOUR NAME HERE"
+author: "Bianca Gonzalez"
 output:
   html_document:
     toc: true
@@ -10,9 +10,9 @@ output:
 ---
 
 ```{r, echo=FALSE, message=FALSE}
-library(ggplot2)
-library(dplyr)
-library(readr) 
+library(tidyverse)
+library(knitr)
+library(forcats)
 ```
 
 
@@ -20,6 +20,12 @@ library(readr)
 # Do not edit this code block. By setting cache=TRUE, we are saving the output 
 # of this block to the cache. That way it only needs to run once.  This is
 # especially useful for portions of code that take a long time to run.
+
+url <- "https://github.com/rudeboybert/JSE_OkCupid/blob/master/profiles.csv.zip?raw=true"
+temp_zip_file <- tempfile()
+download.file(url, temp_zip_file)
+unzip(temp_zip_file, "profiles.csv")
+
 profiles <- read_csv(file="profiles.csv")
 ```
 
@@ -30,12 +36,14 @@ profiles <- read_csv(file="profiles.csv")
 Please indicate
 
 * Who you collaborated with:
+Brenda, Trisha, and Connor. 
 * Roughly how much time you spent on this HW so far:
-* The URL of the RPubs published URL [here](https://www.nhl.com/).
+four hours. 
+* The URL of the RPubs published URL [here](http://rpubs.com/biancaglez94/218371).
 * What gave you the most trouble:
+The shiny app inputs and figuring out how to make groups for low, middle, high income to then show in plots (never achieved)
 * Any comments you have:
-
-
+Quizzes should be worth less, homeworks more. 
 
 ## Question 1:
 
@@ -49,12 +57,163 @@ specifically on the relationship between gender and
 all keeping in mind in HW-3, you will be fitting a logistic regression to
 predict a user's gender based on these variables.
 
-```{r, echo=TRUE, message=TRUE, warning=TRUE, fig.width=8, fig.height=4.5}
+```{r, echo=FALSE, message=TRUE, warning=TRUE, fig.width=8, fig.height=4.5}
+profiles <- profiles %>% 
+  filter(!is.na(diet))
 
 ```
 
 
+To begin exploratory data, let's look at the profile data stored by OKCupid!
+Let's exclude the essays in this dataset, assuming these are highly subjective and they're a little too lengthy for an analysis. 
 
+```{r, results = 'asis', echo=FALSE}
+
+prof_sin <- profiles %>% 
+    select(-essay0, -essay1, -essay2, -essay3, -essay4, -essay5, -essay6, -essay7, -essay8, -essay9, -last_online)
+
+kable(head(prof_sin), digits = 1)
+
+
+#profiles %>% 
+#ggplot(aes(x=job, y=income)) +
+ # facet_wrap(~sex)
+```
+
+Mean Age for both Sexes: 
+
+* Dataset fails to include other sex categories, ie transgender, but we will 
+continue to perform analysis under binary assumptions. 
+
+```{r, results = 'asis', echo=FALSE}
+
+#need to answer the question of how many users are male and female to set stage
+
+prof_female <- prof_sin %>% 
+  mutate(is_female = ifelse(sex == "f", 1, 0))
+
+#takes mean number of ones, and take percent of females. 
+Percent_female <- mean(round(prof_female$is_female)*100)
+Percent_female
+#must have column name for kable table. 
+
+prof_age <- prof_sin %>% 
+  group_by(sex) %>% 
+  summarise(MeanAge = round(mean(age)))   
+kable(prof_age, caption = "Mean Age for OkCupid")
+```
+
+
+Age range using a boxplot to explore variation: 
+```{r, results = 'asis', echo=FALSE}
+#facet by sex 
+#want to have boxplots for both and y axis we want the age range
+
+#clean our dataset 
+prof_viz <- prof_sin 
+  
+ggplot(prof_viz, aes(x = sex, y = age)) +
+    geom_boxplot(fill="grey80", colour = "#3366FF") 
+      #theme_minimal() 
+     
+    #geom_smooth(method ="lm") +
+     # coord_cartesian() +
+       # scale_color_gradient() +
+         # theme_bw()
+  
+```
+
+Median Incomes of Female and Male Profiles
+```{r, results = 'asis', echo=FALSE}
+#relationship between income and gender, 
+#and gender and job, and gender and body type
+
+income <- prof_sin %>% 
+filter(income != -1) 
+  
+income_median <- income %>% 
+  group_by(sex) %>% 
+  summarise(medianIncome = median(income))
+kable(income_median)
+```
+
+These are our median incomes, but let's look at the variation within this. 
+```{r, results = 'asis', echo=FALSE}
+
+ggplot(income, aes(x = sex, y = income)) +
+  geom_jitter(na.rm=TRUE) +
+    geom_boxplot(fill="grey80", colour = "darkgreen", alpha = 1/5) 
+
+income_summary <- income %>% 
+  group_by(sex) %>% 
+  summarise(max_income= max(income), min_income = min(income), sd_income = sd(income)) 
+kable(income_summary)
+
+```
+Over all looks as if the income for males and females is at about the national average. We can question the validity of the data considering it is all self reported. We are also missing -1 values. 
+```{r, results = 'asis', echo=FALSE}
+
+#this will add column saying true false. 
+#income_low <- income %>% 
+ # mutate(low_income = income == between(income$income, 20000,50000))
+
+income_low <- income %>% 
+ filter(between(income$income, 20000,50000))
+
+income_midd <- income %>% 
+  mutate(midd_income = income == between(income$income, 50001,100000))
+
+
+#new column with income type, low, midd, and high
+
+low_p <- ggplot(income_low, aes(x = income, y = age)) +
+  geom_jitter(na.rm=TRUE) +
+    geom_boxplot(fill="grey80", colour = "darkgreen", alpha = 1/5) +
+    facet_wrap(~sex) +
+     ggtitle("Low income group")
+
+#g2 = ggplot(data, aes(x = x, y=y)) + geom_point()
+#g2 + aes(colour=factor(newcol))  This is what I want to do! groups in col. 
+# have column with low, midd, high status. 
+
+midd_p <- ggplot(income_midd, aes(x = midd_income, y = age)) +
+  geom_jitter(na.rm=TRUE) +
+    geom_boxplot(fill="grey80", colour = "darkgreen", alpha = 1/5) +
+    facet_wrap(~sex) + 
+     ggtitle("Middle Class")
+
+#will ask him how to do this later. this seems to tedious a coding process
+
+ggplot(income, aes(x = sex, y = age)) +
+  geom_jitter(na.rm=TRUE) +
+    geom_boxplot(fill="grey80", colour = "darkgreen", alpha = 1/5) +
+      facet_wrap(~income)
+      
+
+```
+
+```{r, results = 'asis', echo=FALSE}
+
+#relationship between gender and job
+prof_sin <- profiles %>% 
+    select(-essay0, -essay1, -essay2, -essay3, -essay4, -essay5, -essay6, -essay7, -essay8, -essay9, -last_online)
+
+job <- prof_sin %>%
+  group_by(job, sex) %>% 
+  tally () %>% 
+  rename(Job_amt = n) 
+
+job_mutate <- job %>% 
+  mutate(prop= Job_amt/sum(Job_amt))
+kable(job_mutate)
+  
+#can we look at proportion of genderjob/jobtotal?
+ggplot(job_mutate, aes(x=fct_reorder(f= job, x= prop), y = prop)) +
+  coord_flip() + 
+   facet_wrap(~sex) +
+      geom_point() 
+
+```
 ## Question 2:
 
 In the file `HW-2_Shiny_App.Rmd`, build the Shiny App discussed in Lec09 on
@@ -65,4 +224,6 @@ Shiny app that
 * Instead of having a radio button to select the genre of movie (`Action`,
 `Animation`, `Comedy`, etc), have a radio button that allows you to toggle
 between comedies and non-comedies. This app should be simpler.
+
+
 
