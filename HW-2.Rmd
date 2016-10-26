@@ -21,15 +21,8 @@ library(forcats)
 # of this block to the cache. That way it only needs to run once.  This is
 # especially useful for portions of code that take a long time to run.
 
-url <- "https://github.com/rudeboybert/JSE_OkCupid/blob/master/profiles.csv.zip?raw=true"
-temp_zip_file <- tempfile()
-download.file(url, temp_zip_file)
-unzip(temp_zip_file, "profiles.csv")
-
 profiles <- read_csv(file="profiles.csv")
 ```
-
-
 
 ## Admistrative:
 
@@ -74,10 +67,6 @@ prof_sin <- profiles %>%
 
 kable(head(prof_sin), digits = 1)
 
-
-#profiles %>% 
-#ggplot(aes(x=job, y=income)) +
- # facet_wrap(~sex)
 ```
 
 Mean Age for both Sexes: 
@@ -94,13 +83,14 @@ prof_female <- prof_sin %>%
 
 #takes mean number of ones, and take percent of females. 
 Percent_female <- mean(round(prof_female$is_female)*100)
-Percent_female
 #must have column name for kable table. 
 
 prof_age <- prof_sin %>% 
   group_by(sex) %>% 
   summarise(MeanAge = round(mean(age)))   
+
 kable(prof_age, caption = "Mean Age for OkCupid")
+
 ```
 
 
@@ -114,27 +104,54 @@ prof_viz <- prof_sin
   
 ggplot(prof_viz, aes(x = sex, y = age)) +
     geom_boxplot(fill="grey80", colour = "#3366FF") 
-      #theme_minimal() 
-     
-    #geom_smooth(method ="lm") +
-     # coord_cartesian() +
-       # scale_color_gradient() +
-         # theme_bw()
   
+```
+
+
+```{r, results = 'asis', echo=FALSE}
+#relationship between income and gender, 
+#and gender and job, and gender and body type
+job_percent <- prof_sin %>% 
+  group_by(job) %>% 
+  tally() %>% 
+  rename(job_tot = n) %>% 
+  mutate(job_percent = (job_tot/sum(job_tot)*100)) %>% 
+  slice(1:10) %>% 
+kable()
+job_percent
+
+
+#this isn't printing out for some reason... interesting.... 
+```
+
+We cannot ignore -1 category, let's review how often someone reports -1 based on gender:
+```{r, results = 'asis', echo=FALSE}
+
+income <- prof_sin %>% 
+filter(income != -1) 
+
+income_1 <- prof_sin %>% 
+  filter(income == -1) 
+  
+income_1 %>% 
+  group_by(sex) %>% 
+  tally() %>% 
+  rename(job_amt = n) %>% 
+  mutate(
+    percent_gender = round(job_amt/sum(job_amt)*100)
+  ) %>% 
+kable()
+
 ```
 
 Median Incomes of Female and Male Profiles
 ```{r, results = 'asis', echo=FALSE}
-#relationship between income and gender, 
-#and gender and job, and gender and body type
 
-income <- prof_sin %>% 
-filter(income != -1) 
-  
 income_median <- income %>% 
   group_by(sex) %>% 
   summarise(medianIncome = median(income))
 kable(income_median)
+
 ```
 
 These are our median incomes, but let's look at the variation within this. 
@@ -146,58 +163,34 @@ ggplot(income, aes(x = sex, y = income)) +
 
 income_summary <- income %>% 
   group_by(sex) %>% 
-  summarise(max_income= max(income), min_income = min(income), sd_income = sd(income)) 
+  summarise(sd_income = sd(income), median_income = median(income)) 
 kable(income_summary)
 
 ```
+
 Over all looks as if the income for males and females is at about the national average. We can question the validity of the data considering it is all self reported. We are also missing -1 values. 
+
 ```{r, results = 'asis', echo=FALSE}
 
-#this will add column saying true false. 
-#income_low <- income %>% 
- # mutate(low_income = income == between(income$income, 20000,50000))
-
-income_low <- income %>% 
- filter(between(income$income, 20000,50000))
-
-income_midd <- income %>% 
-  mutate(midd_income = income == between(income$income, 50001,100000))
+profiles <- income %>% 
+  mutate(income_bracket = ifelse(income == -1, "missing", 
+                                 ifelse(between(income, 20000, 50000), "low", 
+                                        ifelse(between(income, 50001, 100000), "medium", "high"))
+                                 ))
 
 
 #new column with income type, low, midd, and high
-
-low_p <- ggplot(income_low, aes(x = income, y = age)) +
+ggplot(profiles, aes(x = sex, y = income)) +
   geom_jitter(na.rm=TRUE) +
-    geom_boxplot(fill="grey80", colour = "darkgreen", alpha = 1/5) +
-    facet_wrap(~sex) +
-     ggtitle("Low income group")
-
-#g2 = ggplot(data, aes(x = x, y=y)) + geom_point()
-#g2 + aes(colour=factor(newcol))  This is what I want to do! groups in col. 
-# have column with low, midd, high status. 
-
-midd_p <- ggplot(income_midd, aes(x = midd_income, y = age)) +
-  geom_jitter(na.rm=TRUE) +
-    geom_boxplot(fill="grey80", colour = "darkgreen", alpha = 1/5) +
-    facet_wrap(~sex) + 
-     ggtitle("Middle Class")
-
-#will ask him how to do this later. this seems to tedious a coding process
-
-ggplot(income, aes(x = sex, y = age)) +
-  geom_jitter(na.rm=TRUE) +
-    geom_boxplot(fill="grey80", colour = "darkgreen", alpha = 1/5) +
-      facet_wrap(~income)
-      
+    geom_boxplot(fill="grey80", colour = "red", alpha = 1/5) +
+      facet_wrap(~income_bracket, scales = "free") 
 
 ```
 
+Here's a sample of our user's most common jobs:
 ```{r, results = 'asis', echo=FALSE}
 
 #relationship between gender and job
-prof_sin <- profiles %>% 
-    select(-essay0, -essay1, -essay2, -essay3, -essay4, -essay5, -essay6, -essay7, -essay8, -essay9, -last_online)
-
 job <- prof_sin %>%
   group_by(job, sex) %>% 
   tally () %>% 
@@ -205,15 +198,136 @@ job <- prof_sin %>%
 
 job_mutate <- job %>% 
   mutate(prop= Job_amt/sum(Job_amt))
-kable(job_mutate)
-  
-#can we look at proportion of genderjob/jobtotal?
-ggplot(job_mutate, aes(x=fct_reorder(f= job, x= prop), y = prop)) +
-  coord_flip() + 
-   facet_wrap(~sex) +
-      geom_point() 
+
+job_mutate %>% 
+  ungroup() %>%
+  arrange(desc(Job_amt)) %>% 
+  slice(1:3) %>% 
+  kable()
+```
+
+
+Same viz, but a bar chart of proportions to better visualize job proportions. We have also included a line showing the percentage of total female profiles to show the disparities between employment type and gender. 
+```{r, results = 'asis', echo=FALSE}
+ggplot(job_mutate, aes(x=job, y=prop, fill=sex)) +
+  geom_bar(stat="identity", position="dodge") +
+  coord_flip() +
+  geom_hline(yintercept=0.4)
+
+#stat identity, stat dodge, fill = sex
+#low relative to the gender amount. so ten percent is low relative to the gender female 40% and male 60%
+#geom_hline(.4)
+#collapse gender and sex
+
+#check out diet 
+#science tech engineering 
+#include only categorica lvariables that mostly cast the net over all of tots. 
 
 ```
+
+
+Exploring another categorical variable, I am interested in diet variable, but let's see if enough users report these categories and what their frequencies are. 
+```{r, results = 'asis', echo=FALSE}
+#categorical variable code
+
+diets <- profiles %>% 
+  group_by(diet) %>%  
+  tally() %>% 
+  arrange(desc(n))
+
+diets %>% 
+slice(1:10) %>% 
+  kable()
+#how often are these claimed?
+#often the categories are other, but let's try to look at two categories:
+#anything and vegetarain, we are going to ignore our hillal guys because they are 
+#represent a small portion
+```
+
+
+Let's recode these to three similiar categories. About one six of users are vegetarian. Interesting, let's keep digging. 
+
+
+```{r, results = 'asis', echo=FALSE}
+
+di_it <- profiles
+
+
+dre <- di_it%>%
+  mutate(diet_code = fct_recode(diet,
+                            # New name = old name
+                            "omnivore" = "mostly anything",
+                            "omnivore" = "anything",
+                            "omnivore" = "strictly anything",
+                            "omnivore" = "mostly other",
+                            "omnivore" = "strictly other",
+                            "omnivore" = "other",
+                            "veggie" = "mostly vegetarian",
+                            "veggie" = "strictly vegetarian",
+                            "veggie" = "mostly vegan",
+                            "veggie" = "vegetarian",
+                            "veggie" = "strictly vegan",
+                            "veggie" = "vegan",
+                            "other" = "mostly kosher",
+                            "other" = "mostly halal",
+                            "other" = "strictly kosher",
+                            "other" = "strictly halal",
+                            "other" = "halal",
+                            "other" = "kosher"
+  )) 
+  
+dre_tot <- dre %>% 
+  group_by(diet_code) %>% 
+  arrange(desc(diet_code)) %>% 
+  tally() 
+
+dre_tot %>% 
+  kable()
+
+
+dre_sex <- dre %>% 
+  group_by(diet_code, sex) %>% 
+  arrange(desc(diet_code)) %>% 
+  tally() 
+
+dre_sex %>% 
+  kable()
+
+```
+
+
+
+Interested in diet proportions, so let's check this baby out to see if diet is valuable predictor.
+
+
+```{r, results = 'asis', echo=FALSE}
+
+dre_prop <- dre_sex %>% 
+  mutate(
+    prop = n/sum(n)
+  ) 
+
+dre_prop %>% 
+kable()
+  
+```
+
+These proportions and diet totals make me believe they will be a valuable predictor. For example, you have a 40% chance of being a female in this dataset and 40% chance of being a vegetarian if you are female, too. Let's explore this.
+
+Let's plot test hypothesis:
+```{r, results = 'asis', echo=FALSE}
+
+ggplot(dre_prop, aes(x=diet_code, y=prop, fill=sex)) +
+  geom_bar(stat="identity", position="dodge") +
+  coord_flip() +
+  geom_hline(yintercept=0.4) +
+  theme_minimal() + 
+  labs(title ="Diets", x = "Diet Type", y = "Proportion")
+
+
+```
+
+
 ## Question 2:
 
 In the file `HW-2_Shiny_App.Rmd`, build the Shiny App discussed in Lec09 on
